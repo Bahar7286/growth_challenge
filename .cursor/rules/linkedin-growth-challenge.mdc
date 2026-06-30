@@ -1,0 +1,51 @@
+---
+description: LinkedIn Growth Automation Intern Challenge gereksinimleri ve proje kuralları
+alwaysApply: true
+---
+
+# LinkedIn Growth Automation Challenge
+
+## Hedef
+
+Konusarak Öğren için Türkiye'deki HR profesyonellerine outbound growth sistemi kur.
+
+## Minimum Teslim
+
+1. **100 lead** — ad soyad, şirket, unvan, LinkedIn URL, email (varsa)
+2. **Enrichment** — sektör, şirket büyüklüğü, pain point, İngilizce ihtiyacı, outreach angle
+3. **AI outreach** — her lead için kişiselleştirilmiş LinkedIn DM ve cold email (generic değil)
+4. **Workflow** — scraping/cleaning → enrichment → database → outreach → CRM mantığı
+
+## Veri Etiği
+
+- Email, şirket veya unvan **uydurma**
+- Doğrulanamayan alanları `to verify` veya `estimate` olarak işaretle
+- LinkedIn scraping yapma; kullanıcı tarafından sağlanan URL listesini işle
+- Manuel doğrulama: `data/enrichment/verified_profile_fields.csv`
+
+## AI Kuralları
+
+- Enrichment ve outreach **gerçek LLM** ile üret (`src/llm_enrich.py`)
+- Prompt şablonları: `docs/ai_prompt_design.md`
+- API key yoksa kural tabanlı fallback; teslimde LLM entegrasyonu zorunlu
+- Cache: `data/enrichment/llm_cache.json`
+
+## Dosya Konvansiyonları
+
+```
+data/raw/           → ham LinkedIn URL listesi
+data/enrichment/    → verified fields, profile notes, LLM cache
+src/                → build_leads.py, llm_enrich.py
+outputs/            → CSV, XLSX, submission docs
+docs/               → playbook, prompt design, requirement mapping
+```
+
+## Bonus (Korunmalı)
+
+- `lead_score` kolonu
+- `status` CRM pipeline (`new_enriched` → `verified_message_ready` → `contacted` → ...)
+- `docs/growth_playbook.md` — warming, deliverability, multi-step outreach, reply classification
+
+## Teslim Formatı
+
+GitHub repo: README + kod + outputs + docs. Değerlendirici giriş noktası: `outputs/challenge_submission_document.md`
