@@ -8,6 +8,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from hitap import detect_hitap
+
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_PATH = ROOT / "data" / "enrichment" / "llm_cache.json"
 load_dotenv(ROOT / ".env")
@@ -51,6 +53,8 @@ Konuşarak Öğren: Kurumsal ekiplere online İngilizce konuşma pratiği, geli�
 
 Lead:
 Full name: {full_name}
+First name: {first_name}
+Hitap: {hitap}
 Company: {company_name}
 Title: {title}
 Location: {location}
@@ -61,6 +65,7 @@ English need: {english_need_signal}
 
 Kurallar:
 - Generic şablon kullanma; şirket, unvan veya pain point'e özel referans ver.
+- Selamlama mutlaka "Merhaba {first_name} {hitap}" formatında olsun (ör: Elif Hanım, Ahmet Bey).
 - LinkedIn DM max 300 karakter, samimi ve profesyonel Türkçe.
 - Cold email: konu satırı + gövde (max 150 kelime), Türkçe.
 - Bilinmeyen şirket/unvan için "şirketiniz" kullan, uydurma yapma.
@@ -216,8 +221,12 @@ def enrich_lead_with_llm(lead: dict[str, Any], use_cache: bool = True) -> dict[s
         enrichment = _call_llm(client, enrich_prompt)
         time.sleep(0.5)
 
+        first_name = (lead.get("full_name") or "").split()[0] or "Yetkili"
+        hitap = detect_hitap(first_name)
         outreach_prompt = OUTREACH_PROMPT.format(
             full_name=lead.get("full_name", ""),
+            first_name=first_name,
+            hitap=hitap,
             company_name=lead.get("company_name", ""),
             title=lead.get("title", ""),
             location=lead.get("location", ""),

@@ -33,21 +33,7 @@ COMPACT_NAME_MAP = {
     "gülşaheriş": "gülşah eriş",
 }
 
-KADIN_ISIMLERI = {
-    "gülbahar", "elif", "eylül", "sevda", "nazan", "ayten", "sinem", "özgen", "zeynep", "ezgi",
-    "birgül", "banu", "gülşah", "duygu", "merve", "büşra", "fatma", "ayşe", "emine", "hatice",
-    "aslı", "burcu", "ceren", "deniz", "eda", "gamze", "hazal", "irem", "kübra", "melis",
-    "özlem", "pınar", "selin", "tuğba", "yağmur", "yasemin", "gaye", "hande", "didem", "gözde",
-    "nihal", "nursen", "şefaat", "sevgi", "tuğçe", "hilal", "aslıhan", "gül", "çiğdem", "esra",
-    "pervin", "latife", "ceren",
-}
-
-ERKEK_ISIMLERI = {
-    "savaş", "veysel", "berkan", "burak", "recep", "orhan", "onur", "serdal", "ahmet", "mehmet",
-    "ali", "mustafa", "can", "cem", "gökhan", "hakan", "volkan", "murat", "fatih", "ibrahim",
-    "tarık", "kaan", "kerem", "yiğit", "emre", "ozan", "eren", "batu", "ata", "efe", "arda",
-    "aşır",
-}
+from hitap import apply_hitap, detect_hitap
 
 INDUSTRY_KEYWORDS = {
     "Technology / SaaS": ["tech", "yazılım", "software", "digital", "bilişim", "teknoloji"],
@@ -133,17 +119,6 @@ def full_name_from_slug(slug: str) -> str:
     if clean_parts:
         return title_case(" ".join(clean_parts))
     return title_case(re.sub(r"[-_]+", " ", decoded or "Unknown Lead"))
-
-
-def detect_hitap(first_name: str) -> str:
-    name_lower = first_name.lower()
-    if name_lower in KADIN_ISIMLERI:
-        return "Hanım"
-    if name_lower in ERKEK_ISIMLERI:
-        return "Bey"
-    if name_lower[-1] in ["a", "e", "i", "o", "ö", "u", "ü"]:
-        return "Hanım"
-    return "Bey"
 
 
 JUNK_PHRASES = (
@@ -349,6 +324,9 @@ def build_lead(
         and title != VERIFY_TITLE
     )
     status = "verified_message_ready" if verified_ready else "new_enriched_needs_manual_verification"
+
+    linkedin_dm = apply_hitap(first_name, linkedin_dm)
+    cold_email = apply_hitap(first_name, cold_email)
 
     return {
         **base_lead,
