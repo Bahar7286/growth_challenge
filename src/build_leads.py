@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from llm_enrich import enrich_lead_with_llm, is_llm_available
+from llm_enrich import enrich_lead_with_llm, is_llm_available, _normalize_cache_file
 
 RAW_INPUT = ROOT / "data" / "raw" / "linkedin_profile_links_100.csv"
 VERIFIED_INPUT = ROOT / "data" / "enrichment" / "verified_profile_fields.csv"
@@ -415,6 +415,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     use_llm = not args.no_llm
+    _normalize_cache_file()
 
     if not RAW_INPUT.exists():
         raise FileNotFoundError(f"Raw input not found: {RAW_INPUT}")
@@ -467,7 +468,7 @@ def main() -> None:
     ws.title = "Leads"
     ws.append(FIELDNAMES)
     for row in rows:
-        ws.append([row[f] for f in FIELDNAMES])
+        ws.append([str(row[f]) if row[f] is not None else "" for f in FIELDNAMES])
     xlsx_target = XLSX_OUTPUT
     try:
         wb.save(xlsx_target)

@@ -1,12 +1,12 @@
 # LinkedIn Growth Automation Prototype - Konusarak Ogren
 
-Generated: 2026-06-30 19:22 UTC
+Generated: 2026-06-30 20:06 UTC
 
 ## Dataset
 - 100 LinkedIn profile URLs processed.
 - `full_name` extracted from LinkedIn URL slugs.
 - 11 leads with verified company/title (`verified_message_ready`).
-- Enrichment mode: Rule-based fallback
+- Enrichment mode: OpenAI gpt-4o-mini
 
 ## Workflow
 1. LinkedIn people search URLs collected manually.

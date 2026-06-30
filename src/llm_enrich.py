@@ -94,15 +94,47 @@ def _parse_json_response(text: str) -> dict[str, Any]:
     return json.loads(text.strip())
 
 
-def _get_client():
+def _resolve_llm_config() -> tuple[str, str, str]:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    base_url = os.getenv("OPENAI_BASE_URL", "").strip()
+    model = os.getenv("LLM_MODEL", "").strip()
+
+    if api_key.startswith("sk-or-"):
+        base_url = base_url or "https://openrouter.ai/api/v1"
+        model = model or "openai/gpt-4o-mini"
+    else:
+        base_url = base_url or None
+        model = model or "gpt-4o-mini"
+
+    return api_key, base_url or "", model
+
+
+_auth_failed = False
+
+
+def _get_client():
+    global _auth_failed
+    if _auth_failed:
+        return None
+
+    api_key, base_url, _ = _resolve_llm_config()
     if not api_key:
         return None
+
     from openai import OpenAI
+
+    if base_url:
+        return OpenAI(api_key=api_key, base_url=base_url)
     return OpenAI(api_key=api_key)
 
 
-def _call_llm(client, prompt: str, model: str = "gpt-4o-mini") -> dict[str, Any]:
+def _get_model() -> str:
+    return _resolve_llm_config()[2]
+
+
+def _call_llm(client, prompt: str, model: str | None = None) -> dict[str, Any]:
+    global _auth_failed
+    model = model or _get_model()
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
@@ -113,16 +145,61 @@ def _call_llm(client, prompt: str, model: str = "gpt-4o-mini") -> dict[str, Any]
     return _parse_json_response(content)
 
 
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        subject = value.get("subject") or value.get("konu") or value.get("title") or ""
+        body = value.get("body") or value.get("govde") or value.get("content") or ""
+        if subject and body:
+            return f"Konu: {subject}\n\n{body}".strip()
+        if body:
+            return str(body).strip()
+        if subject:
+            return f"Konu: {subject}".strip()
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list):
+        return "\n".join(_as_text(item) for item in value if item)
+    return str(value).strip()
+
+
+def _normalize_llm_result(data: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(data)
+    if "personalized_linkedin_dm" in normalized:
+        normalized["personalized_linkedin_dm"] = _as_text(normalized["personalized_linkedin_dm"])
+    if "personalized_cold_email" in normalized:
+        normalized["personalized_cold_email"] = _as_text(normalized["personalized_cold_email"])
+    if "personalization_basis" in normalized:
+        normalized["personalization_basis"] = _as_text(normalized["personalization_basis"])
+    if "lead_score" in normalized:
+        try:
+            normalized["lead_score"] = int(normalized["lead_score"])
+        except (TypeError, ValueError):
+            normalized["lead_score"] = 0
+    return normalized
+
+
+def _normalize_cache_file() -> None:
+    if not CACHE_PATH.exists():
+        return
+    cache = _load_cache()
+    fixed = {url: _normalize_llm_result(entry) for url, entry in cache.items()}
+    _save_cache(fixed)
+
+
 def is_llm_available() -> bool:
     return _get_client() is not None
 
 
 def enrich_lead_with_llm(lead: dict[str, Any], use_cache: bool = True) -> dict[str, Any]:
-    """Enrichment + outreach via OpenAI. Returns merged fields or empty dict on failure."""
+    """Enrichment + outreach via OpenAI-compatible API. Returns merged fields or empty dict on failure."""
+    global _auth_failed
     url = lead.get("linkedin_url", "")
     cache = _load_cache() if use_cache else {}
     if use_cache and url in cache:
-        return cache[url]
+        return _normalize_llm_result(cache[url])
 
     client = _get_client()
     if not client:
@@ -152,10 +229,21 @@ def enrich_lead_with_llm(lead: dict[str, Any], use_cache: bool = True) -> dict[s
         outreach = _call_llm(client, outreach_prompt)
         time.sleep(0.5)
 
-        result = {**enrichment, **outreach, "llm_enriched": True}
+        result = _normalize_llm_result({**enrichment, **outreach, "llm_enriched": True})
         cache[url] = result
         _save_cache(cache)
         return result
     except Exception as exc:
+        err = str(exc)
+        if "401" in err or "invalid_api_key" in err or "Incorrect API key" in err:
+            _auth_failed = True
+            print(
+                "LLM auth failed: API key gecersiz veya yanlis provider.\n"
+                "  OpenAI key: https://platform.openai.com/api-keys (sk-proj-...)\n"
+                "  OpenRouter key: sk-or-v1... (otomatik algilanir, OPENAI_BASE_URL gerekmez)\n"
+                "Pipeline kural tabanli fallback ile devam ediyor.",
+                flush=True,
+            )
+            return {}
         print(f"LLM error for {url}: {exc}", flush=True)
         return {}
