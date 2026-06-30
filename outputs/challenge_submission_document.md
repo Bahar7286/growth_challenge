@@ -4,26 +4,26 @@
 
 Konusarak Ogren'in Turkiye'deki HR profesyonellerine ulasmasi icin Python tabanli outbound automation prototipi.
 
-Sistem 100 LinkedIn profil linkini alir, temizler, isim cikarir, **OpenAI API** ile enrichment ve kisisellestirilmis outreach uretir, lead score verir ve CSV/Excel veritabanina yazar.
+Sistem 100 LinkedIn profil linkini alir, temizler, isim cikarir, **OpenAI / OpenRouter API** ile enrichment ve kisisellestirilmis outreach uretir, lead score verir ve CSV/Excel veritabanina yazar.
 
-11 lead icin sirket/unvan bilgisi LinkedIn profillerinden manuel dogrulanmis ve `verified_message_ready` durumuna alinmistir.
+**60 lead** icin sirket/unvan bilgisi web arastirmasi ve manuel kontrol ile dogrulanmis; `verified_message_ready` durumundadir. Kalan 40 lead dogrulama kuyrugundadir.
 
 ## Kullanilan Tool'lar
 
 ```text
 Python 3
 openpyxl (CSV/Excel)
-OpenAI API (gpt-4o-mini) — enrichment + outreach
+OpenAI API / OpenRouter (gpt-4o-mini) — enrichment + outreach
 python-dotenv
 Cursor (gelistirme)
-Manual verification workflow
+Web research + manual verification workflow
 ```
 
 ## Veri Toplama
 
 - 100 LinkedIn profil URL'si: `data/raw/linkedin_profile_links_100.csv`
 - `full_name` URL slug'larindan cikarildi
-- 11 lead manuel dogrulandi: `data/enrichment/verified_profile_fields.csv`
+- 60 lead dogrulandi: `data/enrichment/verified_profile_fields.csv` (+ `verified_web_batch.json`)
 - Email uydurulmadi; public gorunmeyen alanlar bos birakildi
 
 ## Lead Enrichment (OpenAI)
@@ -40,7 +40,9 @@ outreach_angle
 lead_score
 ```
 
-API key yoksa kural tabanlı fallback devreye girer (`python src/build_leads.py --no-llm`).
+API key yoksa kural tabanli fallback devreye girer (`python src/build_leads.py --no-llm`).
+
+OpenRouter (`sk-or-v1`) anahtarlari otomatik algilanir.
 
 Cache: `data/enrichment/llm_cache.json`
 
@@ -54,14 +56,14 @@ personalized_cold_email     (konu + govde)
 personalization_basis       (hangi sinyaller kullanildi)
 ```
 
-Dogrulanmis sirket/unvan ile mesajlar belirgin sekilde kisisellestirilir.
+DM selamlamalari **Ad Hanım / Ad Bey** formatinda (`src/hitap.py`). Dogrulanmis sirket/unvan ile mesajlar belirgin sekilde kisisellestirilir.
 
 ### Ornek (verified lead)
 
 **Lead:** Eylul Ozusanli — Antwell Suites Istanbul, IK Muduru
 
-**LinkedIn DM (rule-based fallback ornegi):**
-> Merhaba Eylul Hanim, Antwell Suites Istanbul bünyesinde yürüttüğünüz İnsan Kaynakları Müdürü rolünüz dikkatimi çekti...
+**LinkedIn DM:**
+> Merhaba Eylul Hanım, Antwell Suites Istanbul bünyesinde yürüttüğünüz İnsan Kaynakları Müdürü rolünüz dikkatimi çekti...
 
 **Status:** `verified_message_ready` | **Lead score:** 80+
 
@@ -74,17 +76,17 @@ Raw URL List (100)
       ↓
 Python Cleaning + Name Parse
       ↓
-Verified Fields Merge
+Verified Fields Merge (CSV + web batch)
       ↓
 OpenAI Enrichment (llm_enrich.py)
       ↓
-OpenAI Outreach Generation
+OpenAI Outreach Generation + Hitap (hitap.py)
       ↓
 Lead Scoring
       ↓
 CSV / Excel Database
       ↓
-Manual Verification
+Manual Verification (40 kalan)
       ↓
 Outreach
       ↓
@@ -128,7 +130,7 @@ AdsPower / anti-detect bilincli olarak uygulanmadi (etik + platform kurallari).
 ## Etik ve Limitasyonlar
 
 - Private email uydurulmadi
-- Dogrulanamayan alanlar `to verify` olarak isaretlendi
+- Dogrulanamayan alanlar bos veya `new_enriched_needs_manual_verification` olarak isaretlendi
 - LinkedIn scraping yapilmadi
 - Enrichment tahminleri outreach oncesi dogrulanmali
 
@@ -137,7 +139,14 @@ AdsPower / anti-detect bilincli olarak uygulanmadi (etik + platform kurallari).
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# OPENAI_API_KEY ekle
+# OPENAI_API_KEY veya OpenRouter sk-or-v1 key ekle
+python src/build_leads.py
+```
+
+Yeni dogrulama eklemek icin:
+
+```bash
+python src/apply_verified_batch.py
 python src/build_leads.py
 ```
 
@@ -145,7 +154,7 @@ python src/build_leads.py
 
 ```text
 outputs/linkedin_hr_growth_leads_100.csv
-outputs/linkedin_hr_growth_leads_100_export.xlsx
+outputs/linkedin_hr_growth_leads_100.xlsx
 outputs/challenge_workflow_summary.md
 ```
 
@@ -153,6 +162,6 @@ outputs/challenge_workflow_summary.md
 
 1. Bu dokuman
 2. `outputs/linkedin_hr_growth_leads_100.csv`
-3. `src/build_leads.py` + `src/llm_enrich.py`
+3. `src/build_leads.py` + `src/llm_enrich.py` + `src/hitap.py`
 4. `docs/growth_playbook.md`
 5. `docs/challenge_requirement_mapping.md`
